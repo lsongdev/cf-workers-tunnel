@@ -9,6 +9,11 @@
   "scripts": {
     "build": "tsc -p tsconfig.json"
   },
+  "dependencies": {
+    "@hostc/tunnel-protocol": "workspace:*",
+    "chalk": "^5.3.0",
+    "commander": "^11.0.0"
+  },
   "devDependencies": {
     "@types/node": "^25.6.0",
     "typescript": "^6.0.2"
