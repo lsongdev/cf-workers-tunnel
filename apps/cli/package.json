@@ -1,23 +1,48 @@
 {
 	"name": "hostc",
-	"private": true,
-	"version": "0.0.0",
+	"description": "Expose a local web service (HTTP + WebSocket) through a hostc tunnel",
+	"version": "1.0.0",
 	"main": "./dist/index.js",
+	"homepage": "https://hostc.dev",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/akazwz/hostc.git",
+		"directory": "apps/cli"
+	},
+	"bugs": {
+		"url": "https://github.com/akazwz/hostc/issues"
+	},
+	"keywords": [
+		"tunnel",
+		"localhost",
+		"http",
+		"websocket",
+		"cli",
+		"cloudflare"
+	],
+	"files": [
+		"dist",
+		"README.md"
+	],
+	"engines": {
+		"node": ">=18"
+	},
 	"bin": {
 		"hostc": "./dist/index.js"
 	},
 	"scripts": {
-		"build": "tsc -p tsconfig.json"
+		"build": "tsc -p tsconfig.json --noEmit && tsup --config tsup.config.ts"
 	},
 	"dependencies": {
-		"@hostc/tunnel-protocol": "workspace:*",
 		"chalk": "^5.3.0",
 		"commander": "^11.0.0",
 		"ws": "^8.20.0"
 	},
 	"devDependencies": {
+		"@hostc/tunnel-protocol": "workspace:*",
 		"@types/node": "^25.6.0",
 		"@types/ws": "^8.18.1",
+		"tsup": "^8.5.0",
 		"typescript": "^6.0.2"
 	}
 }

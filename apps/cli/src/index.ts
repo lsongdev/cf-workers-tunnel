@@ -20,13 +20,11 @@ import { WebSocket as LocalWebSocket, type RawData } from "ws";
 
 type HttpCommandOptions = {
 	localHost: string;
-	server: string;
 };
 
 type HttpTunnelOptions = {
 	port: number;
 	localHost: string;
-	server: string;
 };
 
 type RequestInitWithDuplex = RequestInit & {
@@ -76,6 +74,7 @@ class CliError extends Error {
 }
 
 const DEFAULT_SERVER = "https://hostc.dev";
+const SERVER_OVERRIDE_ENV = "HOSTC_SERVER_URL";
 const SPINNER_FRAMES = ["-", "\\", "|", "/"];
 const SESSION_REFRESH_INTERVAL_MS = 5 * 60_000;
 const SESSION_REFRESH_RETRY_MS = 30_000;
@@ -106,7 +105,7 @@ async function main(): Promise<void> {
 	const program = new Command()
 		.name("hostc")
 		.description(
-			"Expose local HTTP and WebSocket services through a hostc tunnel",
+			"Expose a local web service (HTTP + WebSocket) through a hostc tunnel",
 		)
 		.version("0.0.0")
 		.showHelpAfterError();
@@ -115,21 +114,19 @@ async function main(): Promise<void> {
 
 		.argument("<port>", "local port to expose", parsePort)
 		.option(
-			"--server <url>",
-			"Override tunnel server URL",
-			parseServerUrl,
-			DEFAULT_SERVER,
+			"--local-host <host>",
+			"Host of the local service",
+			parseLocalHost,
+			"127.0.0.1",
 		)
-		.option("--local-host <host>", "Local host", parseLocalHost, "127.0.0.1")
 		.addHelpText(
 			"after",
-			"\nExamples:\n  hostc 3000\n  hostc 5173 --local-host 0.0.0.0\n",
+			"\nExamples:\n  hostc 3000\n",
 		)
 		.action(async (port: number, options: HttpCommandOptions) => {
 			await runHttpTunnel({
 				port,
 				localHost: options.localHost,
-				server: options.server,
 			});
 		});
 
@@ -142,6 +139,7 @@ async function main(): Promise<void> {
 }
 
 async function runHttpTunnel(options: HttpTunnelOptions): Promise<void> {
+	const tunnelServer = resolveTunnelServerUrl();
 	const localOrigin = buildLocalOrigin(options.localHost, options.port);
 	const spinner = createSpinner(`Creating tunnel -> ${localOrigin.href}`);
 	let tunnel: CreateTunnelResponse;
@@ -154,7 +152,7 @@ async function runHttpTunnel(options: HttpTunnelOptions): Promise<void> {
 	spinner.start();
 
 	try {
-		tunnel = await createTunnel(options.server);
+		tunnel = await createTunnel(tunnelServer);
 		spinner.update(
 			`Connecting tunnel ${tunnel.subdomain} -> ${localOrigin.href}`,
 		);
@@ -181,7 +179,7 @@ async function runHttpTunnel(options: HttpTunnelOptions): Promise<void> {
 
 		refreshPromise = (async () => {
 			const refreshedSession = await refreshTunnelSession(
-				options.server,
+				tunnelServer,
 				tunnel.tunnelId,
 				tunnel.sessionToken,
 			);
@@ -318,24 +316,40 @@ function parsePort(value: string): number {
 	return port;
 }
 
-function parseServerUrl(value: string): string {
+function normalizeServerUrl(value: string, source: string): string {
+	const trimmed = value.trim();
+
+	if (!trimmed) {
+		throw new CliError(`${source} cannot be empty`);
+	}
+
 	let url: URL;
 
 	try {
-		url = new URL(value);
+		url = new URL(trimmed);
 	} catch {
-		throw new InvalidArgumentError(
-			`Expected an http or https URL, got: ${value}`,
+		throw new CliError(
+			`Expected ${source} to be an http or https URL, got: ${value}`,
 		);
 	}
 
 	if (url.protocol !== "http:" && url.protocol !== "https:") {
-		throw new InvalidArgumentError(
-			`Expected an http or https URL, got: ${value}`,
+		throw new CliError(
+			`Expected ${source} to be an http or https URL, got: ${value}`,
 		);
 	}
 
 	return url.toString();
+}
+
+function resolveTunnelServerUrl(): string {
+	const override = process.env[SERVER_OVERRIDE_ENV];
+
+	if (override === undefined) {
+		return DEFAULT_SERVER;
+	}
+
+	return normalizeServerUrl(override, `environment variable ${SERVER_OVERRIDE_ENV}`);
 }
 
 function parseLocalHost(value: string): string {
