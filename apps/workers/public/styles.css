@@ -59,7 +59,9 @@ body {
 	margin: 0 auto 1.5rem;
 	border-radius: 20%;
 	box-shadow: 0 0 40px rgba(249, 115, 22, 0.15);
-	transition: transform 0.3s ease, box-shadow 0.3s ease;
+	transition:
+		transform 0.3s ease,
+		box-shadow 0.3s ease;
 }
 
 .hero-logo:hover {

@@ -79,9 +79,11 @@ export class HostcDurableObject extends DurableObject<Env> {
 	private readonly pendingResponses = new Map<string, PendingResponse>();
 	private readonly pendingUpgrades = new Map<string, PendingWebSocketUpgrade>();
 	private readonly activeProxySockets = new Map<string, ActiveProxySocket>();
+	private activeControlSocket: WebSocket | null = null;
 
 	constructor(ctx: DurableObjectState, env: Env) {
 		super(ctx, env);
+		this.restoreActiveControlSocket();
 		this.restoreActiveProxySockets();
 	}
 
@@ -163,6 +165,8 @@ export class HostcDurableObject extends DurableObject<Env> {
 			return;
 		}
 
+		this.clearActiveControlSocket(ws);
+
 		logInfo("tunnel.closed", {
 			code,
 			reason,
@@ -186,6 +190,8 @@ export class HostcDurableObject extends DurableObject<Env> {
 			});
 			return;
 		}
+
+		this.clearActiveControlSocket(ws);
 
 		logError("tunnel.socket_error", {
 			error: message,
@@ -213,6 +219,7 @@ export class HostcDurableObject extends DurableObject<Env> {
 
 		this.disconnectExistingClients();
 		this.ctx.acceptWebSocket(serverSocket, [CONTROL_SOCKET_TAG]);
+		this.activeControlSocket = serverSocket;
 
 		logInfo("tunnel.connected", {
 			subdomain,
@@ -638,10 +645,23 @@ export class HostcDurableObject extends DurableObject<Env> {
 	}
 
 	private getTunnelSocket(): WebSocket | null {
+		if (
+			this.activeControlSocket &&
+			this.activeControlSocket.readyState !== WebSocket.CLOSED
+		) {
+			return this.activeControlSocket;
+		}
+
+		this.restoreActiveControlSocket();
+		return this.activeControlSocket;
+	}
+
+	private restoreActiveControlSocket(): void {
 		const sockets = this.ctx.getWebSockets(CONTROL_SOCKET_TAG);
 
 		if (sockets.length === 0) {
-			return null;
+			this.activeControlSocket = null;
+			return;
 		}
 
 		const activeSocket = sockets[sockets.length - 1];
@@ -653,7 +673,7 @@ export class HostcDurableObject extends DurableObject<Env> {
 			);
 		}
 
-		return activeSocket;
+		this.activeControlSocket = activeSocket;
 	}
 
 	private getActiveProxySocket(requestId: string): ActiveProxySocket | null {
@@ -686,11 +706,19 @@ export class HostcDurableObject extends DurableObject<Env> {
 	}
 
 	private disconnectExistingClients(): void {
+		this.activeControlSocket = null;
+
 		for (const socket of this.ctx.getWebSockets(CONTROL_SOCKET_TAG)) {
 			socket.close(
 				TUNNEL_REPLACED_CLOSE_CODE,
 				"Replaced by a newer tunnel connection",
 			);
+		}
+	}
+
+	private clearActiveControlSocket(socket: WebSocket): void {
+		if (this.activeControlSocket === socket) {
+			this.activeControlSocket = null;
 		}
 	}
 

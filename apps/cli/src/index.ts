@@ -119,10 +119,7 @@ async function main(): Promise<void> {
 			parseLocalHost,
 			"127.0.0.1",
 		)
-		.addHelpText(
-			"after",
-			"\nExamples:\n  hostc 3000\n",
-		)
+		.addHelpText("after", "\nExamples:\n  hostc 3000\n")
 		.action(async (port: number, options: HttpCommandOptions) => {
 			await runHttpTunnel({
 				port,
@@ -349,7 +346,10 @@ function resolveTunnelServerUrl(): string {
 		return DEFAULT_SERVER;
 	}
 
-	return normalizeServerUrl(override, `environment variable ${SERVER_OVERRIDE_ENV}`);
+	return normalizeServerUrl(
+		override,
+		`environment variable ${SERVER_OVERRIDE_ENV}`,
+	);
 }
 
 function parseLocalHost(value: string): string {

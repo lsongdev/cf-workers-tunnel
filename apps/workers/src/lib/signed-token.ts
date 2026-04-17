@@ -2,6 +2,7 @@ import { Buffer } from "node:buffer";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
+const importedTokenKeyCache = new Map<string, Promise<CryptoKey>>();
 
 type SignedTokenPayload = {
 	v: number;
@@ -116,13 +117,27 @@ async function signPayload(
 }
 
 function importTokenKey(secret: string): Promise<CryptoKey> {
-	return crypto.subtle.importKey(
-		"raw",
-		encoder.encode(secret),
-		{ name: "HMAC", hash: "SHA-256" },
-		false,
-		["sign", "verify"],
-	);
+	const cachedKey = importedTokenKeyCache.get(secret);
+
+	if (cachedKey) {
+		return cachedKey;
+	}
+
+	const keyPromise = crypto.subtle
+		.importKey(
+			"raw",
+			encoder.encode(secret),
+			{ name: "HMAC", hash: "SHA-256" },
+			false,
+			["sign", "verify"],
+		)
+		.catch((error) => {
+			importedTokenKeyCache.delete(secret);
+			throw error;
+		});
+
+	importedTokenKeyCache.set(secret, keyPromise);
+	return keyPromise;
 }
 
 function encodeBase64Url(value: Uint8Array | string): string {
